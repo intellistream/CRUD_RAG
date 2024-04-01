@@ -2,12 +2,10 @@ import os
 import re
 import json
 import jieba
-import requests
 import numpy as np
+from haystack import Pipeline
 from loguru import logger
 from collections import Counter
-
-from src.llms import GPT
 from importlib import import_module
 
 try:
@@ -20,38 +18,29 @@ json_response = '''
 \"question\": ["2014年中国新增并网光伏发电容量是多少？", "2014年中国新增并网光伏发电容量约占全球新增容量的几分之几？","全国新增光伏电站的容量是多少？", "分布式光伏容量是多少？", "2014年中国光伏发电量是多少？", "2014年中国光伏发电量相比前一年增长了多少？"]}
 '''
 
-class QuestEval(GPT):
-    def __init__(self, model_name='gpt-3.5-turbo', temperature=1.0, max_new_tokens=1024, report=False, task_name='summary'):
-        super().__init__(model_name, temperature, max_new_tokens)
-        self.report = report
-        
-        self.quest_gt_save = self._read_quest_gt(f'{task_name}_quest_gt_save.json')
+
+class QuestEval():
+    def __init__(self, pipeline: Pipeline):
+        self.pipeline = pipeline
 
     def save_quest_gt(self, task_name):
         with open(f'src/quest_eval/{task_name}_quest_gt_save.json', 'w', encoding='utf-8') as f:
             json.dump(self.quest_gt_save, f, ensure_ascii=False, indent=4)
 
     def question_generation(self, text4gen: str):
-        prompt = self._read_prompt_template("quest_eval_gen.txt") 
-        query = prompt.format(json_response=json_response, news=text4gen)
-        
-        extracted_content = self.safe_request(query)
-        question4eval = json.loads(extracted_content)
-        
+        # Use the pipeline for generating questions
+        _, output = self.pipeline.run(query=text4gen)
+        # Process the output to extract generated questions
+        question4eval = json.loads(output["answers"])  # Adjust according to your actual output format
         return question4eval
 
     def question_answer(self, context, question):
-        template = self._read_prompt_template('quest_eval_answer.txt')
-        query = template.format(
-            context=context,
-            questions=question
-        )
-        answers = self.safe_request(query)
-        
-        pattern = r'<response>\n(.*?)\n</response>'
-        real_answers = re.findall(pattern, answers, re.DOTALL)
-        return real_answers
-    
+        # Use the pipeline for answering questions
+        _, output = self.pipeline.run(query=f"{context} [SEP] {question}")
+        # Process the output to extract answers
+        answers = output["answers"]  # Adjust according to your actual output format
+        return answers
+
     def _read_prompt_template(self, filename: str):
         path = os.path.join('src/prompts/', filename)
         if os.path.exists(path):
@@ -60,7 +49,7 @@ class QuestEval(GPT):
         else:
             logger.error(f'Prompt template not found at {path}')
             return ''
-        
+
     def _read_quest_gt(self, filename: str) -> dict:
         path = os.path.join('src/quest_eval', filename)
         if os.path.exists(path):
@@ -69,23 +58,23 @@ class QuestEval(GPT):
         else:
             logger.error(f'Questions generated from ground truth for evaluation not found at {path}')
             return {}
-    
+
     def get_QA_pair(self, data_point: dict):
         ground_truth_text = data_point["ground_truth_text"]
         generated_text = data_point["generated_text"]
-        
+
         if data_point["ID"] in self.quest_gt_save.keys():
             questions_gt = self.quest_gt_save[data_point["ID"]]["question"]
             answers_gt4gt = self.quest_gt_save[data_point["ID"]]["answers"]
         else:
             keyinfo_and_questions = self.question_generation(ground_truth_text)
-            questions_gt = keyinfo_and_questions["question"]           
-            answers_gt4gt = self.question_answer(ground_truth_text, questions_gt) # 用ground truth回答ground truth生成的问题
-            
+            questions_gt = keyinfo_and_questions["question"]
+            answers_gt4gt = self.question_answer(ground_truth_text, questions_gt)  # 用ground truth回答ground truth生成的问题
+
             keyinfo_and_questions["answers"] = answers_gt4gt
             self.quest_gt_save[data_point["ID"]] = keyinfo_and_questions
-    
-        answers_gm4gt = self.question_answer(generated_text, questions_gt) # 用generated text回答ground truth生成的问题
+
+        answers_gm4gt = self.question_answer(generated_text, questions_gt)  # 用generated text回答ground truth生成的问题
 
         return questions_gt, answers_gt4gt, answers_gm4gt
 
@@ -112,7 +101,7 @@ class QuestEval(GPT):
             indices = [i for i, x in enumerate(answers_gm4gt) if x != "无法推断"]
             answers_gm4gt = [answers_gm4gt[i] for i in indices]
             answers_gt4gt = [answers_gt4gt[i] for i in indices]
-            
+
             if answers_gm4gt == []:
                 return 0, 0, quest_eval_save
 
@@ -125,13 +114,13 @@ class QuestEval(GPT):
             quest_eval_save["answers_gt4gt"] = []
             quest_eval_save["answers_gm4gt"] = []
             return 0, 0, quest_eval_save
-        
+
         return quest_avg_f1, quest_recall, quest_eval_save
 
 
 def compute_f1(a_gold, a_pred):
-    gold_toks = list(jieba.cut(a_gold)) 
-    pred_toks = list(jieba.cut(a_pred)) 
+    gold_toks = list(jieba.cut(a_gold))
+    pred_toks = list(jieba.cut(a_pred))
     common = Counter(gold_toks) & Counter(pred_toks)
     num_same = sum(common.values())
     if len(gold_toks) == 0 or len(pred_toks) == 0:
@@ -143,9 +132,9 @@ def compute_f1(a_gold, a_pred):
     f1 = (2 * precision * recall) / (precision + recall)
     return f1
 
-def word_based_f1_score(a_gold_list, a_pred_list):
-    f1_list=[]
-    for a_gold,a_pred in zip(a_gold_list, a_pred_list):
-        f1_list.append(compute_f1(a_gold,a_pred))
-    return np.mean(f1_list)
 
+def word_based_f1_score(a_gold_list, a_pred_list):
+    f1_list = []
+    for a_gold, a_pred in zip(a_gold_list, a_pred_list):
+        f1_list.append(compute_f1(a_gold, a_pred))
+    return np.mean(f1_list)

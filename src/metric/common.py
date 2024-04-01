@@ -29,7 +29,7 @@ def bleu_score(
     f = lambda text: list(jieba.cut(text))
     bleu = evaluate.load('src/.cache/huggingface/bleu')
     results = bleu.compute(predictions=[continuation], references=[[reference]], tokenizer=f)
-    
+
     bleu_avg = results['bleu']
     bleu1 = results['precisions'][0]
     bleu2 = results['precisions'][1]
