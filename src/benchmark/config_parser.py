@@ -11,7 +11,7 @@ def get_arg_parser():
     parser.add_argument('--shuffle', type=bool, default=True, help="Whether to shuffle the dataset")
     # Store related options
     parser.add_argument('--store_type', type=str, choices=['elasticsearch', 'milvus', 'faiss', 'inmemory'],
-                        default='inmemory',
+                        default='elasticsearch',
                         help="Type of document store to use ('elasticsearch', 'milvus', 'faiss', 'inmemory')")
     parser.add_argument('--store_config', type=json.loads, default={},
                         help="JSON string of document store configuration options. Example: '{\"host\": \"localhost\", \"port\": 9200}'")
