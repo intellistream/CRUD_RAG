@@ -24,8 +24,8 @@ def catch_all_exceptions(func):
 def bleu_score(
     continuation: str,
     reference: str,
-    with_penalty = False
-) -> float:
+    with_penalty=False
+) -> tuple:
     f = lambda text: list(jieba.cut(text))
     bleu = evaluate.load('src/.cache/huggingface/bleu')
     results = bleu.compute(predictions=[continuation], references=[[reference]], tokenizer=f)
@@ -40,8 +40,8 @@ def bleu_score(
     if with_penalty:
         return bleu_avg, bleu1, bleu2, bleu3, bleu4
     else:
-        return 0.0 if brevity_penalty==0 else bleu_avg/brevity_penalty, bleu1, bleu2, bleu3, bleu4
-
+        adjusted_bleu_avg = 0.0 if brevity_penalty == 0 else bleu_avg / brevity_penalty
+        return adjusted_bleu_avg, bleu1, bleu2, bleu3, bleu4
 
 @catch_all_exceptions
 def rougeL_score(

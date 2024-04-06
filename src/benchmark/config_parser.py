@@ -10,13 +10,13 @@ def get_arg_parser():
     parser.add_argument('--data_path', default='data/crud_split/split_merged.json', help="Path to the dataset")
     parser.add_argument('--shuffle', type=bool, default=True, help="Whether to shuffle the dataset")
     # Store related options
-    parser.add_argument('--store_type', type=str, choices=['elasticsearch', 'milvus', 'faiss', 'inmemory'],
-                        default='elasticsearch',
+    parser.add_argument('--store_type', type=str, choices=['elasticsearch', 'faiss', 'inmemory'],
+                        default='faiss',
                         help="Type of document store to use ('elasticsearch', 'milvus', 'faiss', 'inmemory')")
     parser.add_argument('--store_config', type=json.loads, default={},
                         help="JSON string of document store configuration options. Example: '{\"host\": \"localhost\", \"port\": 9200}'")
     # Index related options
-    parser.add_argument('--docs_path', default='data/80000_docs', help="Path to the retrieval documents")
+    parser.add_argument('--docs_path', default='data/test_docs', help="Path to the retrieval documents")
     parser.add_argument('--docs_type', default="txt", help="Type of the documents")
     parser.add_argument('--chunk_size', type=int, default=128, help="Chunk size")
     parser.add_argument('--chunk_overlap', type=int, default=0, help="Overlap chunk size")
@@ -26,17 +26,19 @@ def get_arg_parser():
     # Embedder related options
     parser.add_argument('--create_embedder', action='store_true', default=True, help="Whether to create the embedder")
     parser.add_argument('--embedder_name', default='haystack', help="Name of embedder to use")
-    parser.add_argument('--query_embedding_model', default='facebook/dpr-question_encoder-single-nq-base')
-    parser.add_argument('--passage_embedding_model', default='facebook/dpr-ctx_encoder-single-nq-base')
+    parser.add_argument('--query_embedding_model', default='sentence-transformers/multi-qa-mpnet-base-dot-v1')
+    parser.add_argument('--passage_embedding_model', default='sentence-transformers/multi-qa-mpnet-base-dot-v1')
     parser.add_argument('--embedding_dim', type=int, default=768)
     # Retriever related options
-    parser.add_argument('--retriever_type', default="bm25", help="Type of the retriever")
+    parser.add_argument('--retriever_type', type=str,
+                        choices=['bm25', 'dpr', 'embedding'], default = "embedding", help = "Type of the retriever")
     parser.add_argument('--retrieve_top_k', type=int, default=8, help="Top k documents to retrieve")
     # Reranker related options
     parser.add_argument('--reranker_type', default="simple", help="Type of the retriever")
     parser.add_argument('--need_reranker', action='store_true', default=False, help="Whether to use a reranker")
     # Prompter (Generator) related options
-    parser.add_argument('--model_name_or_path', default='MBZUAI/LaMini-Flan-T5-783M', help="Name or path of the model to use")
+    parser.add_argument('--model_name_or_path', default='MBZUAI/LaMini-Cerebras-111M',
+                        help="Name or path of the model to use")
     parser.add_argument('--invocation_layer_class', default=LlamaCPPInvocationLayer,
                         help="the invocation layer class to use")
     parser.add_argument('--temperature', type=float, default=0.1,

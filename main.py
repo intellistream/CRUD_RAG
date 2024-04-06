@@ -5,9 +5,11 @@ from src.benchmark.datasets import get_task_datasets
 from src.benchmark.tasks import tasks_factory
 from src.components.pipeline_factory import PipelineFactory
 from src.evaluator.evaluator import BaseEvaluator
+import logging
 
 
 def main():
+    logging.basicConfig(level=logging.CRITICAL)
     parser = config_parser.get_arg_parser()
     args = parser.parse_args()
     logger.info("Configurations: {}", args)
@@ -18,7 +20,6 @@ def main():
     evaluator = BaseEvaluator(args, pipe, tasks, datasets)
     evaluator.run()
     logger.info("Evaluation completed.")
-
 
 if __name__ == "__main__":
     main()

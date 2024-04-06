@@ -63,7 +63,7 @@ class BaseEvaluator(ABC):
             # Ensure thread safety if using multithreading
             with self.lock:
                 # Running the Haystack pipeline with the provided data point
-                result = self.pipe.run(query=data_point['event'])
+                result = self.pipe.run(query=data_point['event'])['results'][0]
                 return result
 
         except Exception as e:
@@ -97,6 +97,8 @@ class BaseEvaluator(ABC):
                         continue  # Skip results that have already been evaluated and are valid
                     try:
                         generated_text = self.task_generation(data_point)
+                        if generated_text is None:
+                            continue # For debug purpose, skip those without generated text.
                         data_point["generated_text"] = generated_text
                         result = {'id': data_point['ID'], **task.scoring(data_point)}
                         if contain_original_data:

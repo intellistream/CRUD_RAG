@@ -1,10 +1,11 @@
 import os
-from haystack import Pipeline, Document
+
+from haystack import Pipeline
 
 from src.components.prompter.prompter_factory import PrompterFactory
 from src.components.reranker.reranker_factory import RerankerFactory
 from src.components.retrievers.retriever_factory import RetrieverFactory
-from src.components.retrievers.store.store_factory import create_document_store
+from src.components.retrievers.store.store_factory import initialize_document_store
 
 
 def basic_pipeline(args):
@@ -18,33 +19,23 @@ def basic_pipeline(args):
     Returns:
     A Haystack Pipeline with the specified document store.
     """
-    # Extract document store type and configuration from args
-    store_type = args.store_type
-    store_config = vars(args).get("store_config", {})
-
-    # Create the document store using the factory
-    document_store = create_document_store(store_type, **store_config)
-
-    documents = []
-    documents_dir = args.docs_path
-    for filename in os.listdir(documents_dir):
-        file_path = os.path.join(documents_dir, filename)
-        if os.path.isfile(file_path):
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
-                document = Document(content=content)
-                documents.append(document)
-    document_store.write_documents(documents)
+    document_store = initialize_document_store(args)
 
     pipeline = Pipeline()
     # Add a retriever
-    # Use the RetrieverFactory to get the retriever instance
+    # Ensure the retriever is initialized before updating embeddings
     retriever = RetrieverFactory.get_retriever(retriever_type=args.retriever_type,
                                                document_store=document_store,
                                                query_embedding_model=args.query_embedding_model,
                                                passage_embedding_model=args.passage_embedding_model)
-    pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
 
+    if document_store.get_embedding_count() < document_store.get_document_count():
+        document_store.update_embeddings(retriever, update_existing_embeddings=False)
+
+    index_path = os.path.join(args.docs_path, 'my_faiss_index.faiss')
+    document_store.save(index_path)
+
+    pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
 
     # Based on the retriever's configuration, decide if a reranker is needed
     if args.need_reranker:
@@ -61,7 +52,6 @@ def basic_pipeline(args):
     prompter = PrompterFactory.create_prompter(prompter_type=args.prompter_type,
                                                model_name_or_path=args.model_name_or_path)
     pipeline.add_node(component=prompter, name="Prompter", inputs=[last_component])
-
     return pipeline
 
 

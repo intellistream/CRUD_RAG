@@ -39,7 +39,7 @@ class Summary(BaseTask):
             return ''
 
     def scoring(self, data_point: dict) -> dict:
-        generated_text = data_point["generated_text"]['results'][0]
+        generated_text = data_point["generated_text"]
         ground_truth_text = data_point["summary"]
 
         if self.use_quest_eval:
